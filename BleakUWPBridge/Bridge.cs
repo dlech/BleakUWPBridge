@@ -35,6 +35,37 @@ namespace BleakBridge
             return results;
         }
 
+        public async Task<GattDescriptorsResult> GetDescriptorsAsync(GattCharacteristic characteristic)
+        {
+            var x = characteristic.GetDescriptorsAsync();
+            GattDescriptorsResult results = await characteristic.GetDescriptorsAsync();
+            return results;
+        }
+
+        public async Task<Tuple<List<GattDeviceService>, List<GattCharacteristic>, List<GattDescriptor>>> ResolveServices(BluetoothLEDevice ble)
+        {
+            GattDeviceServicesResult results = await ble.GetGattServicesAsync();
+            var services = new List<GattDeviceService>();
+            var characteristics = new List<GattCharacteristic>();
+            var descriptors = new List<GattDescriptor>();
+            var charTasks = new List<IAsyncOperation<GattCharacteristicsResult>>();
+            foreach (var service in results.Services)
+            {
+                GattCharacteristicsResult characteristics_results = await service.GetCharacteristicsAsync();
+                foreach (var characteristic in characteristics_results.Characteristics)
+                {
+                    GattDescriptorsResult descriptor_results = await characteristic.GetDescriptorsAsync();
+                    descriptors.AddRange(descriptor_results.Descriptors);
+                }
+                characteristics.AddRange(characteristics_results.Characteristics);
+            }
+            services.AddRange(results.Services);
+
+            return new Tuple<List<GattDeviceService>, List<GattCharacteristic>,List<GattDescriptor>>(services, characteristics, descriptors);
+        }
+
+        #region Characteristics
+
         private void Characteristic_ValueChanged(GattCharacteristic sender, GattValueChangedEventArgs args)
         {
             if (this.callbacks.ContainsKey(sender.Uuid))
@@ -124,5 +155,44 @@ namespace BleakBridge
             }
             return result;
         }
+
+        #endregion
+
+        #region Descriptors
+
+        public async Task<Tuple<GattCommunicationStatus, byte[]>> ReadDescriptorValueAsync(GattDescriptor descriptor)
+        {
+            GattReadResult result = await descriptor.ReadValueAsync(BluetoothCacheMode.Uncached);
+            byte[] output = null;
+            if (result.Status == GattCommunicationStatus.Success)
+            {
+                var reader = DataReader.FromBuffer(result.Value);
+                output = new byte[reader.UnconsumedBufferLength];
+                reader.ReadBytes(output);
+            }
+            else
+            {
+                output = new byte[0];
+            }
+
+            return new Tuple<GattCommunicationStatus, byte[]>(result.Status, output);
+        }
+
+        public async Task<GattCommunicationStatus> WriteDescriptorValueAsync(GattDescriptor descriptor, byte[] data, bool withResponse)
+        {
+            var writer = new DataWriter();
+            writer.WriteBytes(data);
+            if (withResponse)
+            {
+                GattWriteResult result = await descriptor.WriteValueWithResultAsync(writer.DetachBuffer());
+                return result.Status;
+            }
+            else
+            {
+                return await descriptor.WriteValueAsync(writer.DetachBuffer());
+            }
+        }
+
+        #endregion
     }
 }
