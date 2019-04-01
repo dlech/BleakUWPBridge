@@ -125,21 +125,24 @@ namespace BleakBridge
                 cccdValue = GattClientCharacteristicConfigurationDescriptorValue.Notify;
             }
 
-            status = await characteristic.WriteClientCharacteristicConfigurationDescriptorAsync(cccdValue);
-            if (status == GattCommunicationStatus.Success)
+            // Server has been informed of clients interest.
+            try
             {
-                // Server has been informed of clients interest.
-                try
-                {
-                    this.callbacks[characteristic.Uuid] = callback;
-                    characteristic.ValueChanged += Characteristic_ValueChanged;
-                }
-                catch (UnauthorizedAccessException ex)
-                {
-                    // This usually happens when a device reports that it support indicate, but it actually doesn't.
-                    // TODO: Do not use Indicate? Return with Notify?
-                    return GattCommunicationStatus.AccessDenied;
-                }
+                this.callbacks[characteristic.Uuid] = callback;
+                characteristic.ValueChanged += Characteristic_ValueChanged;
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                // This usually happens when a device reports that it support indicate, but it actually doesn't.
+                // TODO: Do not use Indicate? Return with Notify?
+                return GattCommunicationStatus.AccessDenied;
+            }
+
+            status = await characteristic.WriteClientCharacteristicConfigurationDescriptorAsync(cccdValue);
+            if (status != GattCommunicationStatus.Success)
+            {
+                this.callbacks.Remove(characteristic.Uuid);
+                characteristic.ValueChanged -= Characteristic_ValueChanged;
             }
             return status;
         }
