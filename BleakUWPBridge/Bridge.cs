@@ -23,6 +23,13 @@ namespace BleakBridge
             return ble;
         }
 
+        public async Task<BluetoothLEDevice> BluetoothLEDeviceFromBluetoothAddressAsync(ulong bluetoothAddress)
+        {
+            BluetoothLEDevice ble = await BluetoothLEDevice.FromBluetoothAddressAsync(bluetoothAddress);
+            GattDeviceServicesResult results = await ble.GetGattServicesAsync();
+            return ble;
+        }
+
         public async Task<GattDeviceServicesResult> GetGattServicesAsync(BluetoothLEDevice ble)
         {
             GattDeviceServicesResult results = await ble.GetGattServicesAsync();
